@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedCurate-Bench: Auditing the Diagnostic Validity of Curated Medical Image Datasets</title>
+  <meta name="description" content="MedCurate-Bench asks whether pruned and distilled medical imaging datasets keep diagnostic validity (calibration, rare-class sensitivity, cross-hospital robustness, fairness), not just accuracy. CDEL Workshop, ECCV 2026.">
+  <meta property="og:title" content="MedCurate-Bench: Auditing the Diagnostic Validity of Curated Medical Image Datasets">
+  <meta property="og:description" content="Curated medical datasets keep accuracy while silently losing calibration and rare-class sensitivity. A benchmark of ~3,700 controlled runs, a mechanism, a recoverability split, and a fix. CDEL @ ECCV 2026.">
+  <meta property="og:image" content="static/figures/poster_ushape.png">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230072b2'/><text x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'>M</text></svg>">
+</head>
+<body>
+
+<nav class="top">
+  <div class="container">
+    <a class="brand" href="#top">MedCurate-Bench</a>
+    <ul>
+      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#benchmark">Benchmark</a></li>
+      <li><a href="#lagging">Lagging</a></li>
+      <li><a href="#collapse">Collapse</a></li>
+      <li><a href="#recover">Recoverability</a></li>
+      <li><a href="#distill">Distillation</a></li>
+      <li><a href="#fix">The fix</a></li>
+      <li><a href="#bibtex">BibTeX</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero container" id="top">
+  <span class="venue">CDEL Workshop · ECCV 2026 · Malmö, Sweden</span>
+  <h1 class="title"><span class="brand">MedCurate-Bench:</span> Auditing the Diagnostic Validity of Curated Medical Image Datasets</h1>
+  <p class="authors">Sarthak Pandey<sup>1</sup> &nbsp;·&nbsp; Shreshth Rai<sup>1</sup> &nbsp;·&nbsp; Seifedine Kadry<sup>2</sup></p>
+  <p class="affils"><sup>1</sup> Vision and Interpretability Labs (VAIL), Delhi Technological University &nbsp;·&nbsp; <sup>2</sup> Lebanese American University</p>
+  <div class="buttons">
+    <a class="btn" id="link-paper" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      Paper
+    </a>
+    <a class="btn secondary" id="link-supp" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Supplementary
+    </a>
+    <a class="btn secondary" id="link-code" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+      Code &amp; raw results
+    </a>
+    <a class="btn secondary" id="link-poster" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      Poster
+    </a>
+    <a class="btn secondary" href="#bibtex">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></svg>
+      BibTeX
+    </a>
+  </div>
+
+  <div class="teaser">
+    <figure class="fig">
+      <img src="static/figures/poster_ushape.png" alt="Accuracy after pruning 90% of the training data under four selection rules on eight datasets. Keep-hardest and per-class top-k collapse, keep-easiest deletes rare classes, coverage-aware selection survives.">
+      <figcaption><strong>Holding the difficulty score fixed, the selection rule alone drives class collapse.</strong> Accuracy after pruning 90% of the training data with the EL2N score fixed and only the selection rule varied. Keep-hardest (top-k) and per-class top-k collapse the model; keep-easiest (bottom-k) deletes rare classes; coverage-aware selection on the identical score preserves accuracy. Holds on five medical modalities, a natural-image control, and two real-resolution 96×96 arms with cross-hospital shift.</figcaption>
+    </figure>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">~3,700</div><div class="l">controlled training runs</div></div>
+    <div class="stat"><div class="n">8</div><div class="l">datasets, incl. two 96×96 arms</div></div>
+    <div class="stat"><div class="n">5 × 4</div><div class="l">difficulty scores × selection rules</div></div>
+    <div class="stat"><div class="n">4 + 1</div><div class="l">distillation methods + random-real control</div></div>
+    <div class="stat"><div class="n">5</div><div class="l">hospitals for cross-site fairness</div></div>
+  </div>
+</header>
+
+<main class="container">
+
+<section id="abstract" class="narrow">
+  <h2>Abstract</h2>
+  <p>Data curation (pruning and distilling training sets) is now standard, judged largely by retained accuracy. In medical imaging that is the wrong target: a curated set keeps accuracy while silently losing what clinicians need: calibration, rare-class sensitivity, and stability across sites. We introduce <strong>MedCurate-Bench</strong>, a benchmark for whether curated medical datasets retain <em>diagnostic validity</em>, not just accuracy. Across five modalities, two paradigms, a natural-image control, and two 96×96 arms with cross-hospital shift (~3,700 runs), we find: (i) accuracy is a lagging indicator (worst-class sensitivity degrades 2–4× faster, up to 10–20×); (ii) class collapse is a property of the score×rule pairing, not any single score or rule, and only coverage-aware selection is never catastrophic; (iii) curation damage is asymmetric: temperature scaling recovers most calibration error (78–90% pruning, to 96% distillation) but far less worst-class sensitivity (median 33%); and (iv) a per-class coverage rule never deletes a class and keeps the cross-hospital gap tightest (tied with balanced random). It reframes curation reporting from an accuracy number to a diagnostic-validity profile.</p>
+
+  <div class="cards">
+    <div class="card red">
+      <div class="kicker">Finding 1</div>
+      <h3>Accuracy is a lagging indicator</h3>
+      <p><span class="big">2–4×</span> faster loss of worst-class sensitivity than accuracy, up to 10–20× for the best-behaved methods.</p>
+    </div>
+    <div class="card amber">
+      <div class="kicker">Finding 2</div>
+      <h3>Collapse is a score × rule pathology</h3>
+      <p>Which extreme fails depends on what the score means. Only coverage-aware selection is never catastrophic.</p>
+    </div>
+    <div class="card green">
+      <div class="kicker">Finding 3</div>
+      <h3>Damage is asymmetrically recoverable</h3>
+      <p><span class="big">78–96%</span> of calibration error is restored by temperature scaling; only a median <span class="big">33%</span> of sensitivity by threshold tuning.</p>
+    </div>
+    <div class="card">
+      <div class="kicker">Finding 4</div>
+      <h3>A rule that cannot delete a class</h3>
+      <p>Per-class coverage (<code>pcov</code>) guarantees class survival, wins at real resolution, and keeps the cross-hospital gap tightest.</p>
+    </div>
+  </div>
+</section>
+
+<section id="benchmark" class="navy">
+  <h2><span class="num">1</span>The benchmark</h2>
+  <p class="lede">Hold the model fixed. Vary only the data. Report a validity profile instead of a number.</p>
+
+  <div class="pipeline">
+    <div class="step">
+      <div class="t">Source dataset</div>
+      <div class="d">Five MedMNIST modalities, CIFAR-10 control, Camelyon17 and DermaMNIST-HR at 96×96.</div>
+      <div class="chips"><span class="chip">8 datasets</span></div>
+    </div>
+    <div class="step">
+      <div class="t">Curate</div>
+      <div class="d"><strong>Pruning</strong> = difficulty score × selection rule.<br><strong>Distillation</strong> vs an equal-size random-real control.</div>
+      <div class="chips"><span class="chip">r ∈ {0.5, 0.3, 0.2, 0.1}</span><span class="chip">IPC ∈ {1, 10, 50}</span></div>
+    </div>
+    <div class="step">
+      <div class="t">Train a fixed model</div>
+      <div class="d">Identical architecture, optimiser, schedule, augmentation and step budget across all conditions.</div>
+      <div class="chips"><span class="chip grey">only the data changes</span></div>
+    </div>
+    <div class="step">
+      <div class="t">Validity profile</div>
+      <div class="d">Calibration (ECE, adaptive-ECE, Brier, NLL), worst-class sensitivity (argmax and @95% specificity), cross-hospital robustness, subgroup fairness.</div>
+    </div>
+    <div class="step">
+      <div class="t">Cheapest remedy → split</div>
+      <div class="d">Temperature scaling and per-class threshold tuning, fit on the never-curated validation split. The <strong>residual</strong> is the safety-relevant quantity.</div>
+    </div>
+  </div>
+
+  <div class="two">
+    <div>
+      <div class="kicker">The selection-rule decomposition</div>
+      <p>A pruning condition is a pair <em>(difficulty score) × (selection rule)</em>. We hold the score fixed and vary the rule across four levels: <strong>global top-k</strong> (keep hardest), <strong>global bottom-k</strong> (keep easiest), <strong>per-class top-k</strong> (keep hardest within each class, preserving class proportions exactly), and <strong>coverage</strong> (sample across the score spectrum, as in CCS). Bottom-k separates "spans the difficulty spectrum" from "merely includes easy samples"; per-class top-k isolates class balance from difficulty coverage.</p>
+      <div class="kicker">Scores and methods</div>
+      <p>Pruning: EL2N, GraNd, Forgetting, Moderate-DS and the medical coreset EVA under all four rules, plus Random, class-balanced Random and DRoP. Distillation: DM, DC, MTT and SRe²L, each paired with a random-real control following DD-Ranking. At least three seeds per condition; degenerate models (macro-AUC &lt; 0.60 or accuracy &lt; 60% of full-data) are excluded from rankings.</p>
+    </div>
+    <div>
+      <div class="kicker">Datasets</div>
+      <div class="tablewrap">
+        <table>
+          <tr><th>Dataset</th><th>Classes</th><th>Res.</th><th>Imb.</th><th>Full acc.</th></tr>
+          <tr><td>PathMNIST</td><td>9</td><td>28²</td><td>2×</td><td>0.87</td></tr>
+          <tr><td>DermaMNIST</td><td>7</td><td>28²</td><td>59×</td><td>0.78</td></tr>
+          <tr><td>OCTMNIST</td><td>4</td><td>28²</td><td>6×</td><td>0.74</td></tr>
+          <tr><td>BloodMNIST</td><td>8</td><td>28²</td><td>3×</td><td>0.96</td></tr>
+          <tr><td>PneumoniaMNIST</td><td>2</td><td>28²</td><td>3×</td><td>0.89</td></tr>
+          <tr><td>CIFAR-10 (control)</td><td>10</td><td>28²</td><td>1×</td><td>0.80</td></tr>
+          <tr><td>Camelyon17 (5 hospitals, OOD)</td><td>2</td><td>96²</td><td>1×</td><td>0.80</td></tr>
+          <tr><td>DermaMNIST-HR</td><td>7</td><td>96²</td><td>59×</td><td>0.80</td></tr>
+        </table>
+      </div>
+      <p class="tnote">"Imb." is the max/min class ratio. The two 96×96 arms test whether 28×28 conclusions survive real resolution and real cross-site shift.</p>
+    </div>
+  </div>
+</section>
+
+<section id="lagging" class="red">
+  <h2><span class="num">2</span>Accuracy is a lagging indicator</h2>
+  <p class="lede">Validity breaks first. Accuracy barely moves.</p>
+  <div class="two">
+    <figure class="fig">
+      <img src="static/figures/poster_lagging.png" alt="Relative degradation versus fraction pruned: accuracy loss stays near 3% while worst-class sensitivity loss reaches 14% and calibration error rises 21%.">
+      <figcaption>Relative degradation versus fraction pruned, averaged over non-degenerate methods and MedMNIST modalities. Accuracy moves little while worst-class sensitivity and calibration error degrade sharply.</figcaption>
+    </figure>
+    <div>
+      <div class="callout red">
+        <p><span class="big">3.8× · 2.4×</span>median ratio of fractional worst-class-sensitivity loss to fractional accuracy loss on DermaMNIST and PathMNIST, reaching <strong>10–20×</strong> for the best-behaved methods (Wilcoxon p &lt; 10⁻¹⁰ on DermaMNIST).</p>
+      </div>
+      <p>Concretely, coverage-aware pruning at 30% retention on DermaMNIST costs only <strong>1.2% accuracy</strong> but <strong>27% of worst-class sensitivity</strong>. A practitioner monitoring accuracy sees a successful compression while the model has quietly lost much of its ability to catch its hardest class.</p>
+    </div>
+  </div>
+</section>
+
+<section id="collapse" class="red">
+  <h2><span class="num">3</span>Class collapse is a score × rule pathology</h2>
+  <p class="lede">Both extremes fail while coverage survives, and which extreme is pathological depends on what the score means.</p>
+
+  <div class="kicker">The U-shaped collapse (EL2N, 90% pruned, accuracy)</div>
+  <div class="tablewrap">
+    <table>
+      <tr><th>Dataset</th><th>top-k</th><th>bottom-k</th><th>per-class</th><th>coverage</th><th>full-data</th></tr>
+      <tr><td>DermaMNIST</td><td class="bad">0.13</td><td class="mid">0.67</td><td class="bad">0.22</td><td class="best">0.74</td><td>0.78</td></tr>
+      <tr><td>PathMNIST</td><td class="bad">0.40</td><td class="mid">0.52</td><td class="bad">0.50</td><td class="best">0.88</td><td>0.87</td></tr>
+      <tr><td>OCTMNIST</td><td class="bad">0.34</td><td class="mid">0.51</td><td class="bad">0.21</td><td class="best">0.71</td><td>0.74</td></tr>
+      <tr><td>BloodMNIST</td><td class="bad">0.67</td><td class="mid">0.58</td><td class="mid">0.76</td><td class="best">0.94</td><td>0.96</td></tr>
+      <tr><td>PneumoniaMNIST</td><td>0.90</td><td class="mid">0.62</td><td>0.84</td><td>0.87</td><td>0.89</td></tr>
+      <tr><td>CIFAR-10</td><td class="bad">0.29</td><td class="mid">0.52</td><td class="bad">0.31</td><td class="best">0.69</td><td>0.80</td></tr>
+      <tr><td>Camelyon17 (96×96)</td><td class="bad">0.31</td><td class="mid">0.74</td><td class="bad">0.29</td><td class="best">0.80</td><td>0.80</td></tr>
+      <tr><td>DermaMNIST-HR (96×96)</td><td class="bad">0.14</td><td class="mid">0.67</td><td class="bad">0.23</td><td class="best">0.74</td><td>0.80</td></tr>
+    </table>
+  </div>
+  <p class="tnote">On DermaMNIST bottom-k's 0.67 is exactly the majority-class prevalence: the model predicts the majority everywhere, keeping headline accuracy while deleting the rare class (worst-class sensitivity → 0). Per-class top-k preserves class proportions exactly and still collapses, so class balance is neither necessary nor sufficient. Binary tasks show a "half-U" because keep-easiest cannot delete a class when there are only two.</p>
+
+  <div class="two">
+    <div>
+      <div class="kicker">Non-hardness scores flip the failing extreme</div>
+      <p>The pathology belongs to the score × rule <em>pairing</em>. For the variance score EVA, keep-hardest is fine (0.69 / 0.82 / 0.68 / 0.78 on Derma / Path / OCT / Blood versus EL2N top-k's 0.13 / 0.40 / 0.34 / 0.67) and the weak rule is instead keep-<em>easiest</em> (0.27–0.62), which discards the informative high-variance samples. Coverage rescues EVA's worst-class sensitivity where keep-hardest leaves it near zero (BloodMNIST 0.08 → 0.86). Moderate-DS behaves the same way. <strong>No fixed rule survives every score; only coverage-aware selection does.</strong></p>
+      <div class="callout">
+        <p><strong>Rule of thumb.</strong> Retain samples spanning the difficulty spectrum: even minimal breadth rescues the rare class from total deletion. Collapse reverses as a sharp threshold at k = 2 strata, not a gradual slope.</p>
+      </div>
+    </div>
+    <figure class="fig">
+      <img src="static/figures/poster_doseresponse.png" alt="Worst-class sensitivity and rare-class retention versus coverage breadth k. Both are zero at k=1 and recover at k=2.">
+      <figcaption>Coverage dose–response (EL2N, 90% pruned). The rare class is deleted at k = 1 and rescued the instant any breadth is added.</figcaption>
+    </figure>
+  </div>
+
+  <div class="two rev">
+    <figure class="fig">
+      <img src="static/figures/poster_camelyon.png" alt="Camelyon17 mean cross-hospital AUC and worst-hospital gap per selection rule. Keep-hardest sits at AUC 0.19, below chance, and widens the fairness gap.">
+      <figcaption>Camelyon17 at 96×96, 90% pruned. Left: keep-hardest falls <em>below</em> chance. Right: the same rule widens the worst-hospital AUC gap; coverage and pcov preserve both accuracy and fairness.</figcaption>
+    </figure>
+    <div>
+      <div class="kicker">At real resolution, keep-hardest inverts</div>
+      <div class="callout red">
+        <p><span class="big">AUC 0.19</span>mean cross-hospital AUC under keep-hardest, versus 0.97 for the full-data model. A collapsed constant predictor would sit at 0.5.</p>
+      </div>
+      <p>The inversion is present on the in-distribution training hospitals (AUC 0.17) just as on the out-of-distribution ones (0.23), so it is not a shift effect. The hardest 10% of patches are dominated by ambiguous tumour-boundary tissue whose local appearance is inconsistent with the slide-level label; a model trained only on them ranks cases the wrong way on every hospital. Keep-hardest is <strong>actively harmful</strong>, not merely lossy, on real high-resolution medical data.</p>
+      <p>The coverage rescue reproduces on ResNet-18, on CIFAR-10, and on both 96×96 arms: DermaMNIST-HR gives top-k 0.14 / coverage 0.74 versus 0.13 / 0.74 at 28×28. The mechanism is quantitatively the same at real resolution.</p>
+    </div>
+  </div>
+</section>
+
+<section id="recover" class="green">
+  <h2><span class="num">4</span>The recoverability decomposition</h2>
+  <p class="lede">Calibration damage is consistently fixable. Sensitivity damage mostly is not, for both pruning and all four distillation methods.</p>
+
+  <figure class="fig">
+    <img src="static/figures/poster_recoverability.png" alt="Percent of curation damage recovered by the cheapest remedy: calibration recovered 78 to 96 percent, worst-class sensitivity 12 to 56 percent, across five pruning modalities and four distillation methods.">
+    <figcaption>Fraction of curation-induced damage removed by the cheapest post-hoc remedy (excess over the full-data model). Temperature scaling restores most calibration error; per-class threshold tuning restores far less worst-class sensitivity. The asymmetry is cross-paradigm.</figcaption>
+  </figure>
+
+  <div class="two">
+    <div>
+      <div class="tablewrap">
+        <table>
+          <tr><th>Setting</th><th>Calibration recovered</th><th>Sensitivity recovered</th></tr>
+          <tr><td>DermaMNIST (prune)</td><td class="best">90%</td><td class="bad">18%</td></tr>
+          <tr><td>PathMNIST (prune)</td><td class="best">87%</td><td class="bad">48%</td></tr>
+          <tr><td>OCTMNIST (prune)</td><td class="best">78%</td><td class="bad">36%</td></tr>
+          <tr><td>BloodMNIST (prune)</td><td class="best">84%</td><td class="bad">56%</td></tr>
+          <tr><td>PneumoniaMNIST (prune)</td><td class="best">83%</td><td class="bad">32%</td></tr>
+          <tr><td>Distillation (DM)</td><td class="best">96%</td><td class="bad">17%</td></tr>
+          <tr><td>Distillation (DC)</td><td class="best">93%</td><td class="bad">12%</td></tr>
+          <tr><td>Distillation (MTT)</td><td class="best">78%</td><td class="bad">33%</td></tr>
+          <tr><td>Distillation (SRe²L)</td><td class="best">95%</td><td class="bad">34%</td></tr>
+        </table>
+      </div>
+      <p class="tnote">Per-dataset means over non-degenerate conditions. Pooled over 319 individual conditions the median sensitivity recovery is <strong>33%</strong>, IQR [0%, 69%], and 27% of conditions recover nothing. Holds under adaptive-ECE, Brier, NLL, and at a fixed 95%-specificity operating point.</p>
+    </div>
+    <div>
+      <figure class="fig">
+        <img src="static/figures/fig_mechanism.png" alt="Scatter of minimum class retention after curation against recoverable worst-class sensitivity, Pearson r = 0.28.">
+        <figcaption>Across all 464 non-degenerate conditions, class retention predicts how much recall is recoverable (pooled Pearson r = 0.28, 95% CI [0.19, 0.36]; within-dataset mean r = 0.45, positive on all five datasets).</figcaption>
+      </figure>
+      <div class="callout green">
+        <p><strong>Why the asymmetry.</strong> Rare-class features usually stay separable even when sensitivity is unrecoverable, so feature collapse is not the driver. Post-hoc remedies can re-weight a class the model already learned; they cannot resurrect a class that curation deleted from training.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="distill" class="navy">
+  <h2><span class="num">5</span>Distillation does not transfer to the medical regime</h2>
+  <p class="lede">Natural-image method rankings break on small, imbalanced medical data. Simple distribution matching is the reliable one.</p>
+  <div class="two">
+    <div>
+      <div class="tablewrap">
+        <table>
+          <tr><th>Dataset (majority rate)</th><th>MTT</th><th>SRe²L</th><th>DM</th><th>DC</th><th>random-real</th></tr>
+          <tr><td colspan="6" style="text-align:left;color:var(--muted);font-style:italic">Top-1 accuracy, IPC-10</td></tr>
+          <tr><td>DermaMNIST (0.67)</td><td class="best">0.63</td><td>0.57</td><td>0.52</td><td>0.34</td><td>0.41</td></tr>
+          <tr><td>PathMNIST (0.19)</td><td>0.35</td><td>0.38</td><td class="best">0.59</td><td>0.44</td><td>0.51</td></tr>
+          <tr><td>OCTMNIST (0.25)</td><td>0.37</td><td>0.29</td><td class="best">0.54</td><td>0.30</td><td>0.46</td></tr>
+          <tr><td>BloodMNIST (0.19)</td><td>0.62</td><td>0.60</td><td class="best">0.83</td><td>0.68</td><td>0.80</td></tr>
+          <tr><td>PneumoniaMNIST (0.62)</td><td class="best">0.87</td><td>0.81</td><td>0.83</td><td>0.53</td><td>0.77</td></tr>
+          <tr><td colspan="6" style="text-align:left;color:var(--muted);font-style:italic">Worst-class sensitivity</td></tr>
+          <tr><td>DermaMNIST</td><td>0.10</td><td class="bad">0.00</td><td class="best">0.30</td><td>0.13</td><td>0.22</td></tr>
+          <tr><td>PathMNIST</td><td class="bad">0.00</td><td>0.05</td><td class="best">0.14</td><td>0.03</td><td>0.12</td></tr>
+          <tr><td>OCTMNIST</td><td>0.06</td><td>0.03</td><td class="best">0.34</td><td>0.13</td><td>0.30</td></tr>
+          <tr><td>BloodMNIST</td><td>0.02</td><td>0.12</td><td class="best">0.58</td><td>0.32</td><td>0.46</td></tr>
+          <tr><td>PneumoniaMNIST</td><td class="best">0.75</td><td>0.67</td><td>0.70</td><td>0.39</td><td>0.64</td></tr>
+          <tr><td><strong># beats random-real (acc)</strong></td><td>2/5</td><td>2/5</td><td class="best">5/5</td><td class="bad">0/5</td><td>—</td></tr>
+        </table>
+      </div>
+    </div>
+    <div>
+      <figure class="fig">
+        <img src="static/figures/fig_distill.png" alt="Accuracy at IPC-10 for MTT, SRe2L, DM, DC and the random-real control across five MedMNIST datasets.">
+        <figcaption>IPC-10 accuracy against an equal-size random-real control. DM beats the control on all five datasets; MTT and SRe²L on 2/5; DC on none.</figcaption>
+      </figure>
+      <p>MTT's accuracy-best 0.63 on DermaMNIST sits <em>below</em> the 0.67 majority-class rate with among the worst sensitivity (0.10). Where the majority rate already exceeds most methods' accuracy, accuracy is nearly uninformative and it is the sensitivity ranking, on which DM leads four of five datasets, that tracks clinical utility. The recoverability asymmetry holds for all four methods regardless of their accuracy ranking. <strong>Do not assume natural-image distillation results transfer to medical data.</strong></p>
+    </div>
+  </div>
+</section>
+
+<section id="fix" class="green">
+  <h2><span class="num">6</span>A constructive fix: per-class coverage</h2>
+  <p class="lede"><code>pcov</code> applies coverage-aware sampling within each class. By construction it can never delete a class, and it preserves within-class difficulty coverage.</p>
+  <div class="two">
+    <div>
+      <div class="tablewrap">
+        <table>
+          <tr><th>Dataset</th><th>pcov</th><th>CCS</th><th>Δ (95% CI)</th></tr>
+          <tr><td>DermaMNIST</td><td>0.309</td><td>0.236</td><td>+0.073 [−0.04, +0.20]</td></tr>
+          <tr><td>PathMNIST</td><td>0.448</td><td>0.439</td><td>+0.008 [−0.01, +0.03]</td></tr>
+          <tr><td>OCTMNIST</td><td class="best">0.714</td><td>0.689</td><td>+0.025 [+0.006, +0.041] *</td></tr>
+          <tr><td>BloodMNIST</td><td>0.839</td><td>0.846</td><td>−0.008 [−0.03, +0.02]</td></tr>
+          <tr><td>Camelyon17 (96×96)</td><td class="best">0.644</td><td>0.593</td><td>+0.051 (real-res)</td></tr>
+        </table>
+      </div>
+      <p class="tnote">Worst-class sensitivity after threshold tuning at 90% pruning. On small MedMNIST data pcov ties the strongest baseline (only OCT is significant); at real resolution it wins on both sensitivity and accuracy (Camelyon17 0.82 vs 0.80).</p>
+    </div>
+    <div>
+      <div class="tablewrap">
+        <table>
+          <tr><th>Camelyon17, r = 0.1</th><th>mean AUC</th><th>worst-hospital gap ↓</th></tr>
+          <tr><td>full-data</td><td>0.967</td><td>0.106</td></tr>
+          <tr><td>top-k (EL2N)</td><td class="bad">0.194</td><td class="bad">0.161</td></tr>
+          <tr><td>coverage (CCS)</td><td>0.949</td><td>0.100</td></tr>
+          <tr><td><strong>pcov</strong> (fix)</td><td>0.949</td><td class="best">0.098</td></tr>
+          <tr><td>random-balanced</td><td>0.955</td><td>0.098</td></tr>
+        </table>
+      </div>
+      <p class="tnote">The selection rule that causes class collapse also causes unfairness across hospitals; the safe rule preserves both. pcov keeps the gap at or below the full-data level, tied with balanced random.</p>
+    </div>
+  </div>
+
+  <div class="kicker">Practical takeaways</div>
+  <div class="takeaways">
+    <div class="take blue"><span class="lead">Prune with coverage.</span><p>Never keep-hardest, never keep-easiest. Coverage-aware selection is the only rule that is safe across score semantics.</p></div>
+    <div class="take green"><span class="lead">Guarantee survival with pcov.</span><p>Prefer the per-class variant when class survival must be guaranteed. It never deletes a class and matches or beats the best empirical rule.</p></div>
+    <div class="take red"><span class="lead">Recalibrate, but do not trust it.</span><p>Temperature scaling restores calibration after curating. It does not restore lost rare-class sensitivity. Report both, raw and post-remedy.</p></div>
+  </div>
+</section>
+
+<section id="bibtex" class="narrow">
+  <h2>BibTeX</h2>
+  <pre class="bib" id="bib"><button class="copy" onclick="copyBib()">Copy</button>@inproceedings{pandey2026medcurate,
+  title     = {MedCurate-Bench: Auditing the Diagnostic Validity of Curated Medical Image Datasets},
+  author    = {Pandey, Sarthak and Rai, Shreshth and Kadry, Seifedine},
+  booktitle = {ECCV 2026 Workshop on Curated Data for Efficient Learning (CDEL)},
+  year      = {2026}
+}</pre>
+</section>
+
+</main>
+
+<footer>
+  <div class="container">
+    <div class="labs">Vision and Interpretability Labs (VAIL), Delhi Technological University &nbsp;·&nbsp; Lebanese American University</div>
+    <div>Contact: <a href="mailto:sarthakpandey_ep24b08_032@dtu.ac.in">sarthakpandey_ep24b08_032@dtu.ac.in</a></div>
+    <div style="margin-top:10px">The benchmark harness, all runners, and every raw per-run result are released with the supplementary material.</div>
+  </div>
+</footer>
+
+<script>
+  var LINKS = {
+    paper:  "#",
+    supp:   "#",
+    code:   "#",
+    poster: "#"
+  };
+  Object.keys(LINKS).forEach(function (k) {
+    var el = document.getElementById("link-" + k);
+    if (el) { el.href = LINKS[k]; if (LINKS[k] !== "#") { el.target = "_blank"; el.rel = "noopener"; } }
+  });
+  function copyBib() {
+    var text = document.getElementById("bib").innerText.replace(/^Copy\s*/, "");
+    navigator.clipboard.writeText(text).then(function () {
+      var b = document.querySelector(".copy"); b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500);
+    });
+  }
+</script>
+</body>
+</html>
