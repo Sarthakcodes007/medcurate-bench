@@ -2,6 +2,11 @@
 
 Static site, no build step.
 
+Live:
+
+- https://medcurate-bench.vercel.app (Vercel, production)
+- https://sarthakcodes007.github.io/medcurate-bench/ (GitHub Pages)
+
 Deploy on Vercel:
 
     npm i -g vercel
